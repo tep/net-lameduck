@@ -15,6 +15,8 @@ var (
 	defaultSignals = []os.Signal{unix.SIGINT, unix.SIGTERM}
 )
 
+// Runner is the lame-duck coordinator for a type implementing the Server
+// interface.
 type Runner struct {
 	server  Server
 	period  time.Duration
