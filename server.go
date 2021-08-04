@@ -170,6 +170,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	//
 	eg.Go(func() error {
 		r.logf("Starting server")
+		close(r.ready)
 		if err := r.server.Serve(ctx); err != nil {
 			r.logf("Server failed: %v", err)
 			return err
