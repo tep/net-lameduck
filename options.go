@@ -8,7 +8,7 @@ import (
 // Option is the interface implemented by types that offer optional behavior
 // while running a Server with lame-duck support.
 type Option interface {
-	set(*runner)
+	set(*Runner)
 }
 
 // Period returns an Option that alters the lame-duck period to the given
@@ -19,7 +19,7 @@ func Period(p time.Duration) Option {
 
 type period time.Duration
 
-func (p period) set(r *runner) {
+func (p period) set(r *Runner) {
 	r.period = time.Duration(p)
 }
 
@@ -32,7 +32,7 @@ func Signals(s ...os.Signal) Option {
 
 type signals []os.Signal
 
-func (s signals) set(r *runner) {
+func (s signals) set(r *Runner) {
 	r.signals = ([]os.Signal)(s)
 }
 
@@ -57,7 +57,7 @@ func WithoutLogger() Option {
 	return &loggerOption{}
 }
 
-func (o *loggerOption) set(r *runner) {
+func (o *loggerOption) set(r *Runner) {
 	if r.logf = o.logger.Infof; r.logf == nil {
 		// a "silent" logger
 		r.logf = func(string, ...interface{}) {}

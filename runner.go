@@ -15,7 +15,7 @@ var (
 	defaultSignals = []os.Signal{unix.SIGINT, unix.SIGTERM}
 )
 
-type runner struct {
+type Runner struct {
 	server  Server
 	period  time.Duration
 	signals []os.Signal
@@ -25,12 +25,12 @@ type runner struct {
 	once sync.Once
 }
 
-func newRunner(svr Server, options []Option) (*runner, error) {
+func newRunner(svr Server, options []Option) (*Runner, error) {
 	if svr == nil {
 		return nil, errors.New("nil Server")
 	}
 
-	r := &runner{
+	r := &Runner{
 		server:  svr,
 		period:  defaultPeriod,
 		signals: defaultSignals,
@@ -53,7 +53,7 @@ func newRunner(svr Server, options []Option) (*runner, error) {
 	return r, nil
 }
 
-func (r *runner) close() {
+func (r *Runner) close() {
 	if r == nil || r.done == nil {
 		if r != nil {
 			r.logf("r.done is nil !!!")

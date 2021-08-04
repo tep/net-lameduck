@@ -82,16 +82,39 @@ type Server interface {
 // reciept of one or more configurable signals. By default, the lame-duck
 // period is 3s and is triggered by SIGINT or SIGTERM. Options are available
 // to alter these values.
+//
+// Note that:
+//
+//    r, err := lameduck.Run(ctx, svr)
+//
+// ...is equivalent to calling:
+//
+// 		if r, err := lameduck.NewRunner(svr); err == nil {
+// 			r.Run(ctx)
+// 		}
+//
 func Run(ctx context.Context, svr Server, options ...Option) error {
 	r, err := newRunner(svr, options)
 	if err != nil {
 		return err
 	}
 
-	return r.run(ctx)
+	return r.Run(ctx)
 }
 
-func (r *runner) run(ctx context.Context) error {
+// Runner returns a lame-duck Runner that providing coordinated lame-duck
+// behavior for the given svr.
+//
+// See the Run func for details.
+func NewRunner(svr Server, options ...Option) (*Runner, error) {
+	return newRunner(svr, options)
+}
+
+// Run executes the receiver's Server while providing coordinated lame-duck
+// behavior on reciept of one or more configurable signals.
+//
+// See the Run func for details.
+func (r *Runner) Run(ctx context.Context) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

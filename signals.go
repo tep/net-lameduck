@@ -18,7 +18,7 @@ type signaler interface {
 	stop(chan<- os.Signal)
 }
 
-func (r *runner) waitForSignal(ctx context.Context) (os.Signal, error) {
+func (r *Runner) waitForSignal(ctx context.Context) (os.Signal, error) {
 	ch := make(chan os.Signal, 1)
 	defer close(ch)
 
