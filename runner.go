@@ -20,6 +20,7 @@ type Runner struct {
 	period  time.Duration
 	signals []os.Signal
 	logf    func(string, ...interface{})
+	state   State
 	ready   chan struct{}
 	done    chan struct{}
 
@@ -36,6 +37,7 @@ func newRunner(svr Server, options []Option) (*Runner, error) {
 		period:  defaultPeriod,
 		signals: defaultSignals,
 		logf:    log.Infof,
+		state:   NotStarted,
 		ready:   make(chan struct{}),
 		done:    make(chan struct{}),
 	}

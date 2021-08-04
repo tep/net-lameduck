@@ -169,13 +169,18 @@ func (r *Runner) Run(ctx context.Context) error {
 	//   - Otherwise, wait for the Context or receiver to be "done".
 	//
 	eg.Go(func() error {
+		defer r.close()
+
 		r.logf("Starting server")
+		r.state = Running
 		close(r.ready)
 		if err := r.server.Serve(ctx); err != nil {
+			r.state = Failed
 			r.logf("Server failed: %v", err)
 			return err
 		}
 
+		r.state = Stopping
 		r.logf("Stopping server")
 
 		select {
@@ -186,6 +191,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			r.logf("Server stopped")
 		}
 
+		r.state = Stopped
 		return nil
 	})
 
