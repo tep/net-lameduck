@@ -67,13 +67,20 @@ func (tc *testcase) test(t *testing.T) {
 
 	var wg sync.WaitGroup
 
+	r, err := NewRunner(svr, tc.runOptions...)
+	if err != nil {
+		t.Fatalf("cannot create Runner: %v", err)
+	}
+
+	tc.chkState(t, r, NotStarted)
+
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
 		defer close(errs)
 
-		if err := Run(ctx, svr, tc.runOptions...); err != nil {
+		if err := r.Run(ctx); err != nil {
 			tl.Infof("Run error: %v", err)
 			errs <- err
 		} else {
@@ -111,11 +118,17 @@ func (tc *testcase) test(t *testing.T) {
 		})
 	}
 
+	r.Ready()
+
+	tc.chkState(t, r, Running)
+
 	if got := <-errs; !tc.isWanted(got) {
 		t.Errorf("Run(ctx, svr) == (%v); wanted (%v)", got, tc.want)
 	}
 
 	wg.Wait()
+
+	tc.chkState(t, r, Stopped)
 }
 
 func (tc *testcase) isWanted(got error) bool {
@@ -124,6 +137,30 @@ func (tc *testcase) isWanted(got error) bool {
 	}
 
 	return got == tc.want
+}
+
+func (tc *testcase) chkState(t *testing.T, r *Runner, want State) {
+	t.Helper()
+
+	t.Logf("want:%v tc:%#v", want, tc)
+
+	switch want {
+	case Stopped:
+		if tc.want == context.Canceled {
+			want = Failed
+		}
+		fallthrough
+
+	case Running:
+		time.Sleep(100 * time.Microsecond) // to compensate for test flakiness
+		if tc.serveError == errServeFailed {
+			want = Failed
+		}
+	}
+
+	if got := r.State(); got != want {
+		t.Errorf("r.State() == %v; wanted %v", got, want)
+	}
 }
 
 // A convenience method added to type LameDuckError (only during testing).
