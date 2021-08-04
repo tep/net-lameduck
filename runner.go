@@ -20,6 +20,7 @@ type Runner struct {
 	period  time.Duration
 	signals []os.Signal
 	logf    func(string, ...interface{})
+	ready   chan struct{}
 	done    chan struct{}
 
 	once sync.Once
@@ -35,6 +36,7 @@ func newRunner(svr Server, options []Option) (*Runner, error) {
 		period:  defaultPeriod,
 		signals: defaultSignals,
 		logf:    log.Infof,
+		ready:   make(chan struct{}),
 		done:    make(chan struct{}),
 	}
 
@@ -51,6 +53,12 @@ func newRunner(svr Server, options []Option) (*Runner, error) {
 	}
 
 	return r, nil
+}
+
+// Ready returns a channel that is closed when the receiver's underlying
+// Server is ready to serve reqeuests.
+func (r *Runner) Ready() <-chan struct{} {
+	<-r.ready
 }
 
 func (r *Runner) close() {
