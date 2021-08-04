@@ -60,7 +60,7 @@ func newRunner(svr Server, options []Option) (*Runner, error) {
 // Ready returns a channel that is closed when the receiver's underlying
 // Server is ready to serve reqeuests.
 func (r *Runner) Ready() <-chan struct{} {
-	<-r.ready
+	return r.ready
 }
 
 func (r *Runner) close() {
