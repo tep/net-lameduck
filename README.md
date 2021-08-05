@@ -1,6 +1,7 @@
 
+# lameduck [![Mit License][mit-img]][mit] [![GitHub Release][release-img]][release] [![GoDoc][godoc-img]][godoc] [![Go Report Card][reportcard-img]][reportcard]
 
-# toolman.org/net/lameduck
+`import toolman.org/net/lameduck`
 
 Package `lameduck` provides coordinated lame-duck behavior for any service
 implementing this package's Server interface.
@@ -124,4 +125,16 @@ the below rules:
   a `*LameDuckError` wrapping that error but both of its boolean fields will be
   false.
 
+
+[mit-img]: http://img.shields.io/badge/License-MIT-c41e3a.svg
+[mit]: https://github.com/tep/net-lameduck/blob/master/LICENSE
+
+[release-img]: https://img.shields.io/github/release/tep/net-lameduck/all.svg
+[release]: https://github.com/tep/net-lameduck/releases
+
+[godoc-img]: https://pkg.go.dev/badge/toolman.org/net/lameduck.svg
+[godoc]: https://pkg.go.dev/toolman.org/net/lameduck
+
+[reportcard-img]: https://goreportcard.com/badge/toolman.org/net/lameduck
+[reportcard]: https://goreportcard.com/report/toolman.org/net/lameduck
 
