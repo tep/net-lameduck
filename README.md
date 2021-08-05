@@ -1,190 +1,127 @@
 
 
 # toolman.org/net/lameduck
-`import "toolman.org/net/lameduck"`
 
-* [Overview](#pkg-overview)
-* [Index](#pkg-index)
-
-## <a id="pkg-overview">Overview</a>
-
-Package lameduck provides coordinated lame-duck behavior for any service
+Package `lameduck` provides coordinated lame-duck behavior for any service
 implementing this package's Server interface.
+
+    type Server interface {
+      Serve(context.Context) error
+      Shutdown(context.Context) error
+      Close() error
+    }
 
 By default, lame-duck mode is triggered by receipt of SIGINT or SIGTERM
 and the default lame-duck period is 3 seconds.  Options are provided to
-alter these (an other) values.
+alter these (and other) values.
 
 This package is written assuming behavior similar to the standard library's
-http.Server -- in that its Shutdown and Close methods exhibit behavior
-matching the lameduck.Server interface -- however, in order to allow other
+`http.Server` -- in that its `Shutdown` and `Close` methods exhibit behavior
+matching the `lameduck.Server` interface -- however, in order to allow other
 types to be used, a Serve method that returns nil is also needed.
 
-For example:
+Here's an example wrapper around `http.Server` that leverages this package:
 
-	type LameDuckServer struct {
-		 // This embedded http.Server provides Shutdown and Close methods
-		 // with behavior expected by the lameduck.Server interface.
-	  *http.Server
-	}
-	
-	// Serve executes ListenAndServe in a manner compliant with the
-	// lameduck.Server interface.
-	func (s *LameDuckServer) Serve(context.Contxt) error {
-	  err := s.Server.ListenAndServe()
-	
-	  if err == http.ErrServerClosed {
-	    err = nil
-	  }
-	
-	  return err
-	}
-	
-	// Run will run the receiver's embedded http.Server and provide
-	// lame-duck coverage on receipt of SIGTERM or SIGINT.
-	func (s *LameDuckServer) Run(ctx context.Context) error {
-	  return lameduck.Run(ctx, s)
-	}
+    package mypkg
 
+    import (
+      "net/http"
+      "toolman.org/net/lameduck"
+    )
 
+    type MyLameDuckServer struct {
+       // This embedded http.Server provides Shutdown and Close methods
+       // with behavior expected by the lameduck.Server interface.
+      *http.Server
+    }
+    
+    // Serve executes the embedded http.Server's ListenAndServe method in
+    // a manner compliant with the lameduck package's Server interface.
+    func (s *MyLameDuckServer) Serve(context.Contxt) error {
+      err := s.ListenAndServe()
+    
+      if err == http.ErrServerClosed {
+        err = nil
+      }
+    
+      return err
+    }
+    
+    // Run will run the receiver's embedded http.Server and provide
+    // lame-duck coverage on receipt of SIGTERM or SIGINT.
+    func (s *MyLameDuckServer) Run(ctx context.Context) error {
+      return lameduck.Run(ctx, s)
+    }
 
+...and a simple `main` packages that uses it:
 
-## <a id="pkg-index">Index</a>
-* [func Run(ctx context.Context, svr Server, options ...Option) error](#Run)
-* [type LameDuckError](#LameDuckError)
-  * [func (lde *LameDuckError) Error() string](#LameDuckError.Error)
-  * [func (lde *LameDuckError) Unwrap() error](#LameDuckError.Unwrap)
-* [type Logger](#Logger)
-* [type Option](#Option)
-  * [func Period(p time.Duration) Option](#Period)
-  * [func Signals(s ...os.Signal) Option](#Signals)
-  * [func WithLogger(l Logger) Option](#WithLogger)
-  * [func WithoutLogger() Option](#WithoutLogger)
-* [type Server](#Server)
+    package main
 
+    import (
+      "fmt"
+      "net/http"
 
-#### <a id="pkg-files">Package files</a>
-[options.go](https://golang.org/src//target/options.go) [runner.go](https://golang.org/src//target/runner.go) [server.go](https://golang.org/src//target/server.go) [signals.go](https://golang.org/src//target/signals.go)
+      "mypkg"
+    )
 
-## <a id="Run">func</a> [Run](https://golang.org/src/./server.go?s=3375:3441#L85)
-``` go
-func Run(ctx context.Context, svr Server, options ...Option) error
-```
-Run executes the given Server providing coordinated lame-duck behavior on
-reciept of one or more configurable signals. By default, the lame-duck
-period is 3s and is triggered by SIGINT or SIGTERM. Options are available
-to alter these values.
+    func main() {
+      mlds := &mypkg.MyLameDuckServer{&http.Server{Addr: ":8080"}}
 
+      if err := mlds.Run(context.Background()); err != nil {
+        fmt.Printf("Server error: %v", err)
+      }
+    }
 
-## <a id="LameDuckError">type</a> [LameDuckError](https://golang.org/src/./server.go?s=5324:5382#L173)
-``` go
-type LameDuckError struct {
-    Expired bool
-    Err     error
-}
+The above illustrates a simple wrapper around http.Server that may be started
+using the provided Run method. This server will continue to run until receiving
+a SIGINT or SIGTERM. On receipt of one of these signals, lameduck logic will
+call its Server's Shutdown method which, in turn, will cause ListenAndServe
+to return immediately -- as specified in the net/http documentation:
 
-```
-LameDuckError is the error type returned by Run for errors related to
-lame-duck mode.
+> When Shutdown is called, Serve, ListenAndServe, and ListenAndServeTLS
+> immediately return ErrServerClosed. Make sure the program doesn't exit and
+> waits instead for Shutdown to return.
 
+Note however that the call to the underlying Server's Shutdown method indicates
+that start of lame-duck processing which will continue until all in-flight
+requests have completed or the provided Context is canceled:
 
-### <a id="LameDuckError.Error">func</a> (\*LameDuckError) [Error](https://golang.org/src/./server.go?s=5384:5424#L178)
-``` go
-func (lde *LameDuckError) Error() string
-```
+> Shutdown gracefully shuts down the server without interrupting any active
+> connections. Shutdown works by first closing all open listeners, then
+> closing all idle connections, and then waiting indefinitely for connections
+> to return to idle and then shut down. If the provided context expires before
+> the shutdown is complete, Shutdown returns the context's error, otherwise it
+> returns any error returned from closing the Server's underlying Listener(s).
 
-### <a id="LameDuckError.Unwrap">func</a> (\*LameDuckError) [Unwrap](https://golang.org/src/./server.go?s=5728:5768#L202)
-``` go
-func (lde *LameDuckError) Unwrap() error
-```
+This package ensures that a proper Context is provided to Shutdown having
+a Deadline indicating the desired lame-duck grace period -- by default,
+3 seconds -- then reacts accordingly based on the error returned by Shutdown.
 
-## <a id="Logger">type</a> [Logger](https://golang.org/src/./options.go?s=853:909#L40)
-``` go
-type Logger interface {
-    Infof(string, ...interface{})
-}
-```
-Logger is the interface needed for the WithLogger Option.
+If a non-nil error is returned from Run it will always be of type
+LameDuckError:
 
+    type LameDuckError struct {
+      Expired bool
+      Failed  bool
+      Err     error
+    }
 
-## <a id="Option">type</a> [Option](https://golang.org/src/./options.go?s=171:210#L10)
-``` go
-type Option interface {
-    // contains filtered or unexported methods
-}
-```
-Option is the interface implemented by types that offer optional behavior
-while running a Server with lame-duck support.
+If `Serve` returns an error, Run returns a `*LameDuckError` with `Failed` set to
+true and Err set to that returned by Serve.
 
+If the call to `Shutdown` returns nil, this indicates the the underlying Server
+has stopped completely within the desired lame-duck grace period. In this case,
+Run will return nil.  Otherwise, the error returned by `Shutdown` will follow
+the below rules:
 
-### <a id="Period">func</a> [Period](https://golang.org/src/./options.go?s=299:334#L16)
-``` go
-func Period(p time.Duration) Option
-```
-Period returns an Option that alters the lame-duck period to the given
-Duration.
+* If `Shutdown` returns `context.DeadlineExceeded` then Run's `*LameDuckError`
+  will have a `true` value for `Expired` and its `Err` field will contain the
+  error returned from the Server's `Close` method - if any.  Note also that the
+  underlying Server's `Close` method is only called when `Shutdown` returns
+  `context.DeadlineExceeded`.
 
-
-### <a id="Signals">func</a> [Signals](https://golang.org/src/./options.go?s=639:674#L29)
-``` go
-func Signals(s ...os.Signal) Option
-```
-Signals returns an Options that changes the list of Signals that trigger the
-beginning of lame-duck mode. Using this Option fully replaces the previous
-list of triggering signals.
-
-
-### <a id="WithLogger">func</a> [WithLogger](https://golang.org/src/./options.go?s=1176:1208#L51)
-``` go
-func WithLogger(l Logger) Option
-```
-WithLogger returns an Option that alters this package's logging facility
-to the provided Logger. Note, the default Logger is one derived from
-'github.com/golang/glog'. To prevent all logging, use WithoutLogger.
-
-
-### <a id="WithoutLogger">func</a> [WithoutLogger](https://golang.org/src/./options.go?s=1318:1345#L56)
-``` go
-func WithoutLogger() Option
-```
-WithoutLogger returns an option the disables all logging from this package.
-
-
-## <a id="Server">type</a> [Server](https://golang.org/src/./server.go?s=1978:3119#L55)
-``` go
-type Server interface {
-    // Serve executes the Server. If Serve returns an error, that error will be
-    // returned immediately by Run and no lame-duck coverage will be provided.
-    //
-    Serve(context.Context) error
-
-    // Shutdown is called by Run (after catching one of the configured signals)
-    // to initiate a graceful shutdown of the Server; this marks the beginning
-    // of lame-duck mode. If Shutdown returns a nil error before the configured
-    // lame-duck period has elapsed, Run will immediately return nil as well.
-    //
-    // The Context provided to Shutdown will have a timeout set to the configured
-    // lame-duck Period. If Shutdown returns context.DeadlineExceeded, Run will
-    // return a LameDuckError with its Expired field set to true and Err set to
-    // the return value from calling Close.
-    //
-    // Any other error returned by Shutdown will be wrapped by a LameDuckError
-    // with its Expired field set to false.
-    Shutdown(context.Context) error
-
-    // Close is called by Run when Shutdown returns context.DeadlineExceeded and
-    // its return value will be assigned to the Err field of the LameDuckError
-    // returned by Run.
-    Close() error
-}
-```
-Server defines the interface that should be implemented by types intended
-for lame-duck support. It is expected that these methods exhibit behavior
-similar to http.Server -- in that a call to Shutdown or Close should cause
-Serve to return immediately.
-
-However, unlike http.Server's Serve, ListenAndServe, and ListenAndServeTLS
-methods (which return http.ErrServerClosed in this situation), this Serve
-method should return a nil error when lame-duck mode is desired.
+* On the other hand, if `Shutdown` returns some other error, `Run` will return
+  a `*LameDuckError` wrapping that error but both of its boolean fields will be
+  false.
 
 
