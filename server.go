@@ -150,10 +150,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		case context.DeadlineExceeded:
 			r.logf("Lame-duck period has expired")
-			return &LameDuckError{
-				Expired: true,
-				Err:     r.server.Close(),
-			}
+			return &LameDuckError{Expired: true, Err: r.server.Close()}
 
 		default:
 			r.logf("error shutting down server: %v", err)
@@ -177,7 +174,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		if err := r.server.Serve(ctx); err != nil {
 			r.state = Failed
 			r.logf("Server failed: %v", err)
-			return err
+			return &LameDuckError{Failed: true, Err: err}
 		}
 
 		r.state = Stopping
@@ -202,6 +199,7 @@ func (r *Runner) Run(ctx context.Context) error {
 // lame-duck mode.
 type LameDuckError struct {
 	Expired bool
+	Failed  bool
 	Err     error
 }
 
