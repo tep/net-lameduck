@@ -1,7 +1,9 @@
 package lameduck
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -20,6 +22,7 @@ var (
 type Runner struct {
 	server  Server
 	period  time.Duration
+	escOK   bool
 	signals []os.Signal
 	logf    func(string, ...interface{})
 	state   State
@@ -57,6 +60,23 @@ func newRunner(svr Server, options []Option) (*Runner, error) {
 	}
 
 	return r, nil
+}
+
+func (r *Runner) serve(ctx context.Context) error {
+	if r == nil {
+		return errors.New("bad state: nil receiver")
+	}
+
+	err := r.server.Serve(ctx)
+
+	switch {
+	case err == nil:
+		return nil
+	case r.escOK && err == http.ErrServerClosed:
+		return nil
+	default:
+		return err
+	}
 }
 
 // Ready returns a channel that is closed when the receiver's underlying

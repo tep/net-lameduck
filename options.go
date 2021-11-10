@@ -11,6 +11,8 @@ type Option interface {
 	set(*Runner)
 }
 
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 // Period returns an Option that alters the lame-duck period to the given
 // Duration.
 func Period(p time.Duration) Option {
@@ -22,6 +24,8 @@ type period time.Duration
 func (p period) set(r *Runner) {
 	r.period = time.Duration(p)
 }
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // Signals returns an Options that changes the list of Signals that trigger the
 // beginning of lame-duck mode. Using this Option fully replaces the previous
@@ -35,6 +39,8 @@ type signals []os.Signal
 func (s signals) set(r *Runner) {
 	r.signals = ([]os.Signal)(s)
 }
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 // Logger is the interface needed for the WithLogger Option.
 type Logger interface {
@@ -63,3 +69,17 @@ func (o *loggerOption) set(r *Runner) {
 		r.logf = func(string, ...interface{}) {}
 	}
 }
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+func ErrServerClosedOK() Option {
+	return new(escOK)
+}
+
+type escOK struct{}
+
+func (e *escOK) set(r *Runner) {
+	r.escOK = true
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

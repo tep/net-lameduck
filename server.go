@@ -38,6 +38,7 @@ package lameduck
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -134,7 +135,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		sig, err := r.waitForSignal(ctx)
 		if err != nil {
-			return err
+			return &LameDuckError{Err: err}
 		}
 
 		r.logf("Received signal [%s]; entering lame-duck mode for %v", sig, r.period)
@@ -163,7 +164,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	//
 	//   - Calls Serve
 	//   - If Server returns a non-nil error, return it immediately
-	//   - Otherwise, wait for the Context or receiver to be "done".
+	//   - Otherwise, wait for the Context or receiver to be "done"
+	//     and return nil.
 	//
 	eg.Go(func() error {
 		defer r.close()
@@ -171,7 +173,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		r.logf("Starting server")
 		r.state = Running
 		close(r.ready)
-		if err := r.server.Serve(ctx); err != nil {
+
+		if err := r.serve(ctx); err != nil {
 			r.state = Failed
 			r.logf("Server failed: %v", err)
 			return &LameDuckError{Failed: true, Err: err}
@@ -182,7 +185,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			r.logf("Context canceled wait for server shutdown")
+			r.logf("Context canceled waiting for server shutdown")
 
 		case <-r.done:
 			r.logf("Server stopped")
@@ -232,4 +235,31 @@ func (lde *LameDuckError) Unwrap() error {
 		return nil
 	}
 	return lde.Err
+}
+
+func (lde *LameDuckError) GoString() string {
+	if lde == nil {
+		return "<nil>"
+	}
+
+	var parts []string
+
+	if lde.Expired {
+		parts = append(parts, fmt.Sprint("Expired: true"))
+	}
+
+	if lde.Failed {
+		parts = append(parts, fmt.Sprint("Failed: true"))
+	}
+
+	switch lde.Err {
+	case nil:
+		// nop
+	case context.Canceled, context.DeadlineExceeded:
+		parts = append(parts, fmt.Sprintf("Err: %v", lde.Err))
+	default:
+		parts = append(parts, fmt.Sprintf("Err: %T{%v}", lde.Err, lde.Err))
+	}
+
+	return fmt.Sprintf("&LameDuckError{%s}", strings.Join(parts, ", "))
 }

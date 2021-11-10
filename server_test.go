@@ -3,7 +3,9 @@ package lameduck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,8 +38,8 @@ func TestRun(t *testing.T) {
 	cases := map[string]*testcase{
 		"normal":   mkCase(sendSignal(unix.SIGTERM), shutdownReturn(nil), lameDuckExpires),
 		"expired":  mkCase(sendSignal(unix.SIGTERM), lameDuckExpires, shutdownReturn(nil), wantError(&LameDuckError{Expired: true})),
-		"canceled": mkCase(cancelContext, wantError(context.Canceled)),
-		"nostart":  mkCase(serveReturn(errServeFailed), wantError(errServeFailed)),
+		"canceled": mkCase(cancelContext, wantError(&LameDuckError{Err: context.Canceled})),
+		"nostart":  mkCase(serveReturn(errServeFailed), wantError(&LameDuckError{Err: errServeFailed})),
 		"badstop":  mkCase(sendSignal(unix.SIGTERM), shutdownReturn(errShutdownFailed), lameDuckExpires, wantError(&LameDuckError{Err: errShutdownFailed})),
 	}
 
@@ -118,12 +120,12 @@ func (tc *testcase) test(t *testing.T) {
 		})
 	}
 
-	r.Ready()
+	<-r.Ready()
 
 	tc.chkState(t, r, Running)
 
 	if got := <-errs; !tc.isWanted(got) {
-		t.Errorf("Run(ctx, svr) == (%v); wanted (%v)", got, tc.want)
+		t.Errorf("##### Run(ctx, svr) == %#v; wanted %#v", got, tc.want)
 	}
 
 	wg.Wait()
@@ -146,21 +148,69 @@ func (tc *testcase) chkState(t *testing.T, r *Runner, want State) {
 
 	switch want {
 	case Stopped:
-		if tc.want == context.Canceled {
+		if errors.Is(tc.want, context.Canceled) {
 			want = Failed
 		}
+
+		if errors.Is(tc.want, errServeFailed) {
+			want = NotStarted
+		}
+
 		fallthrough
 
 	case Running:
 		time.Sleep(100 * time.Microsecond) // to compensate for test flakiness
+
 		if tc.serveError == errServeFailed {
 			want = Failed
 		}
 	}
 
 	if got := r.State(); got != want {
-		t.Errorf("r.State() == %v; wanted %v", got, want)
+		t.Errorf("##### r.State() == %v; wanted %v", got, want)
 	}
+}
+
+func (tc *testcase) GoString() string {
+	if tc == nil {
+		return "<nil>"
+	}
+
+	var parts []string
+
+	if tc.signal != nil {
+		parts = append(parts, fmt.Sprintf("signal: %v", tc.signal))
+	}
+
+	if tc.signalAfter != 0 {
+		parts = append(parts, fmt.Sprintf("signalAfter: %v", tc.signalAfter))
+	}
+
+	if tc.shutdownAfter != 0 {
+		parts = append(parts, fmt.Sprintf("shutdownAfter: %v", tc.shutdownAfter))
+	}
+
+	if tc.cancelAfter != 0 {
+		parts = append(parts, fmt.Sprintf("cancelAfter: %v", tc.cancelAfter))
+	}
+
+	if tc.serveError != nil {
+		parts = append(parts, fmt.Sprintf("serveError: %v", tc.serveError))
+	}
+
+	if tc.closeError != nil {
+		parts = append(parts, fmt.Sprintf("closeError: %v", tc.closeError))
+	}
+
+	if len(tc.runOptions) != 0 {
+		parts = append(parts, fmt.Sprintf("runtimeOptions: %#v", tc.runOptions))
+	}
+
+	if tc.want != nil {
+		parts = append(parts, fmt.Sprintf("want: %#v", tc.want))
+	}
+
+	return fmt.Sprintf("&testcase{%s}", strings.Join(parts, ", "))
 }
 
 // A convenience method added to type LameDuckError (only during testing).
