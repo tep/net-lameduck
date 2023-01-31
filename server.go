@@ -143,6 +143,13 @@ func (r *Runner) Run(ctx context.Context) error {
 		ctx, cancel2 := context.WithTimeout(ctx, r.period)
 		defer cancel2()
 
+		if r.psHook != nil {
+			r.logf("Calling configured pre-shutdown hook")
+			if err := r.psHook(ctx); err != nil {
+				r.logf("Pre-shutdown hook failed: %v", err)
+			}
+		}
+
 		err = r.server.Shutdown(ctx)
 		switch err {
 		case nil:

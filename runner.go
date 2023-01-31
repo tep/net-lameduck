@@ -25,6 +25,7 @@ type Runner struct {
 	escOK   bool
 	signals []os.Signal
 	logf    func(string, ...interface{})
+	psHook  hookFunction
 	state   State
 	ready   chan struct{}
 	done    chan struct{}

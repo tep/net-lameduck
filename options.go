@@ -1,6 +1,7 @@
 package lameduck
 
 import (
+	"context"
 	"os"
 	"time"
 )
@@ -68,6 +69,29 @@ func (o *loggerOption) set(r *Runner) {
 		// a "silent" logger
 		r.logf = func(string, ...interface{}) {}
 	}
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// HookFunction is a function that may be registered using the Option provided
+// by WithPreShutdownHook.
+type HookFunction func(ctx context.Context) error
+
+// WithPreShutdownHook registers a function to be executed just prior to server
+// Shutdown. The Context passed to the HookFunction is the same one passed to
+// Run and, if the HookFunction returns an error it is merely logged (if
+// logging is enabled).  Otherwise, it will be ignored.
+//
+// Note: Only one HookFunction may be registered. If this Option is given
+// multiple times, all but the final one will be ignored.
+func WithPreShutdownHook(f HookFunction) Option {
+	return hookFunction(f)
+}
+
+type hookFunction HookFunction
+
+func (f hookFunction) set(r *Runner) {
+	r.psHook = f
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
